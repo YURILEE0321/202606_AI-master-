@@ -2,43 +2,24 @@ from ..config import config
 from ..state import WikiAssistantState
 
 
-def _format_answer(state: WikiAssistantState) -> str:
-    answer = state.get("answer")
-    if not answer:
-        return "답변을 생성하지 못했습니다."
-
-    source_lines = "\n".join(f"- {s['title']} ({s['source_file']})" for s in state.get("sources", []))
-
-    parts = [
-        f"[핵심 답변]\n{answer['core_answer']}",
-        f"[상세 설명]\n{answer['detail']}",
-    ]
-    if answer["related_menus"]:
-        parts.append(f"[관련 메뉴/업무 절차]\n{', '.join(answer['related_menus'])}")
-    if source_lines:
-        parts.append(f"[참고 출처]\n{source_lines}")
-
-    return "\n\n".join(parts)
-
-
-# confidence >= threshold: 답변 확정.
-# confidence < threshold: retry_count를 올리고, max_retries 이내면 Query Rewriter로 보낼 수 있도록
-#   escalation_required=False로 둔 채 리턴(라우팅은 graph.py의 조건부 엣지가 retry_count로 판단한다).
-#   max_retries를 넘기면 담당자 문의 안내를 final_message로 확정한다.
+# confidence는 검색 점수(reranked_docs)만으로 계산되며 Answer Generator보다 먼저 실행된다.
+# confidence >= threshold: Context Builder -> Answer Generator로 진행해 답변을 생성한다.
+# confidence < threshold: retry_count를 올리고, max_retries 이내면 Query Rewriter로 보낸다
+#   (라우팅은 graph.py의 조건부 엣지가 담당). max_retries를 넘기면 담당자 문의 안내를
+#   final_message로 확정하고, 불필요한 Answer Generator 호출 없이 바로 종료한다.
 def confidence_checker(state: WikiAssistantState) -> dict:
     reranked_docs = state.get("reranked_docs", [])
     top_score = reranked_docs[0]["score"] if reranked_docs else 0.0
     confidence_score = max(0.0, min(1.0, top_score))
-    has_context = bool(state.get("context", "").strip())
-    passed = has_context and confidence_score >= config.confidence_threshold
+    passed = bool(reranked_docs) and confidence_score >= config.confidence_threshold
 
     if passed:
         return {
             "confidence_score": confidence_score,
             "escalation_required": False,
-            "final_message": _format_answer(state),
             "attempt_log": [
-                f"[Confidence Checker] confidence={confidence_score:.2f} >= {config.confidence_threshold} → 답변 확정"
+                f"[Confidence Checker] confidence={confidence_score:.2f} >= {config.confidence_threshold} "
+                "→ 답변 생성 진행"
             ],
         }
 
