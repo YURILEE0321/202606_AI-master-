@@ -1,0 +1,139 @@
+---
+id: MENU-001
+title: AI Defect Inspection Platform 메뉴 사용법
+doc_type: 메뉴 가이드
+category: AI Defect Inspection Platform
+version: v1.0
+created_date: 2026-07-02
+updated_date: 2026-07-02
+approval_status: pending
+approved_by: null
+tags: [메뉴가이드, Settings, Review, Model, Deployment, Monitoring]
+source_file: data/메뉴 사용법.md
+related_menus: [Settings, Review, Model, Deployment, Monitoring]
+summary: 장비 연동부터 데이터 수집, AI 판정 리뷰, 모델 학습·배포, 운영 모니터링까지 이어지는 플랫폼 5대 메뉴(Settings/Review/Model/Deployment/Monitoring)의 목적과 사용 시점 안내.
+---
+
+# AI Defect Inspection Platform 메뉴 사용법
+
+## 개요
+
+플랫폼은 반도체 장비에서 생성된 검사 이미지를 수집하고, AI 모델을 이용하여 양품/불량 판정을 수행한 후
+모델을 지속적으로 개선하고 운영할 수 있도록 지원한다.
+
+업무 흐름:
+
+```
+Settings(장비 연동·데이터 수집) → Review(데이터 검토·AI 판정 확인) → Model(AI 모델 학습)
+→ Deployment(A/B Test·운영 배포) → Monitoring(운영 현황·모델 성능 모니터링)
+```
+
+## 예상 질문
+
+- "신규 장비를 연결하려면 어떤 메뉴를 사용해야 하나요?"
+- "AI 판정 결과는 어디에서 확인하나요?"
+- "모델을 재학습하려면 어떤 절차를 따라야 하나요?"
+- "A/B Test는 어느 메뉴에서 수행하나요?"
+- "운영 중인 모델의 성능은 어디에서 모니터링하나요?"
+
+## 주요 내용
+
+### 1. Settings
+
+**메뉴 목적**: 반도체 장비와 AI 플랫폼을 연동하여 검사 데이터를 정상적으로 수집할 수 있도록 설정하는 메뉴이다.
+
+**주요 기능**
+- 장비 등록 및 관리
+- API Endpoint 설정
+- 데이터 전송 규격(JSON) 설정
+- Request Body 설정
+- 이미지 저장 경로 설정
+- 데이터 수집 활성화
+- 장비별 Recipe 설정
+
+**사용 시점**: 신규 장비를 연결하는 경우 / 데이터 전송 방식이 변경되는 경우 / API 또는 Request Body를 수정하는 경우
+
+### 2. Review
+
+**메뉴 목적**: 장비에서 수집된 검사 데이터와 AI 모델의 판정 결과를 확인하고 리뷰하는 메뉴이다.
+
+**주요 기능**
+- 수집된 이미지 조회
+- AI 판정 결과 확인
+- Confidence Score 확인
+- 양품/불량 결과 확인
+- 모델 버전 확인
+- 불량 유형 확인
+- 운영자의 리뷰 수행
+
+**사용 시점**: AI 결과를 검토할 때 / 모델의 판정 결과를 확인할 때 / 오판 사례를 분석할 때
+
+### 3. Model
+
+**메뉴 목적**: AI 모델을 생성하고 학습하는 메뉴이다.
+
+**주요 기능**
+- 신규 모델 생성
+- 학습 데이터 선택
+- 학습 실행
+- 모델 성능 확인
+- Accuracy, Precision, Recall 확인
+- 모델 버전 관리
+
+**사용 시점**: 새로운 모델을 개발하는 경우 / 기존 모델을 재학습하는 경우 / 모델 성능을 개선하는 경우
+
+### 4. Deployment
+
+**메뉴 목적**: 학습이 완료된 AI 모델을 운영 환경에 배포하는 메뉴이다.
+
+**주요 기능**
+- 배포 대상 모델 선택
+- 운영 모델 변경
+- A/B Test 수행
+- Canary 배포
+- Rollback 수행
+- 배포 이력 관리
+
+**사용 시점**: 신규 모델을 운영에 적용하는 경우 / 기존 모델과 성능을 비교하는 경우 / 운영 모델을 변경하는 경우
+
+### 5. Monitoring
+
+**메뉴 목적**: 운영 중인 AI 모델과 데이터 처리 현황을 모니터링하는 메뉴이다.
+
+**주요 기능**
+- 모델 성능 추이
+- 양품/불량 비율
+- Confidence Score 추이
+- 처리량(Throughput)
+- 추론 시간(Inference Time)
+- 모델별 운영 현황
+- 이상 징후 모니터링
+
+**사용 시점**: 모델 성능을 지속적으로 확인하는 경우 / 운영 현황을 모니터링하는 경우 / 모델 성능 저하 여부를 분석하는 경우
+
+### 업무 시나리오 예시
+
+**신규 장비 연동**
+1. Settings에서 장비 및 데이터 전송 정보를 등록한다.
+2. 장비에서 검사 이미지와 메타데이터를 플랫폼으로 전송한다.
+3. Review에서 수집된 데이터와 AI 판정 결과를 확인한다.
+
+**신규 모델 운영**
+1. Model에서 새로운 AI 모델을 학습한다.
+2. Deployment에서 기존 모델과 A/B Test를 수행한다.
+3. 성능이 검증되면 운영 모델로 배포한다.
+4. Monitoring에서 운영 중인 모델의 성능과 트렌드를 지속적으로 확인한다.
+
+## 관련 메뉴 / 업무 절차
+
+| 메뉴 | 목적 | 주요 사용자 | 다음 단계 |
+| --- | --- | --- | --- |
+| Settings | 장비와 플랫폼 연동 및 데이터 수집 환경 설정 | 운영자 | Review |
+| Review | 수집된 데이터와 AI 판정 결과 검토 | 운영자, 공정 엔지니어 | Model |
+| Model | AI 모델 학습 및 성능 평가 | AI 개발자 | Deployment |
+| Deployment | 모델 A/B Test 및 운영 배포 | AI 개발자, 운영자 | Monitoring |
+| Monitoring | 운영 모델 성능 및 서비스 현황 모니터링 | 운영자 | Model(재학습) 또는 Deployment(재배포) |
+
+## 참고 자료 / 출처
+
+- 원본 문서: `data/메뉴 사용법.md`
