@@ -1,4 +1,5 @@
 1. 코드 수행 방법
+
 cd wiki-assistant-py
 .venv\Scripts\python.exe -m scripts.ingest             # 이미 데이터가 있어 생략 가능(둘 다 같은 컬렉션 공유)
 .venv\Scripts\python.exe -m src.ask "GOOD과 DEFECT의 차이는 무엇인가?"
