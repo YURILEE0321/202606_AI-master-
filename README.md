@@ -112,6 +112,85 @@ PowerShell 실행 정책 때문에 `Activate.ps1`이 막히면, 활성화 없이
 | `CONFIDENCE_THRESHOLD` | `0.7` | 답변 확정 기준 신뢰도 |
 | `MAX_RETRIES` | `3` | Query Rewriter 최대 재시도 횟수 |
 
+## API 서버 실행 방법
+
+`wiki-assistant-py/app/`에 기존 그래프(`src/graph.py`)를 그대로 감싼 FastAPI 서버가 있습니다.
+
+```bash
+cd wiki-assistant-py
+.venv\Scripts\python.exe -m pip install -r requirements.txt   # fastapi 등 포함
+
+# 로컬 실행 (개발용, 코드 변경 시 자동 재시작)
+.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# 또는
+.venv\Scripts\python.exe -m app.main
+```
+
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+
+### Docker 실행
+
+```bash
+docker build -t ai-wiki-assistant .
+docker run -p 8000:8000 --env-file .env ai-wiki-assistant
+```
+
+### API
+
+**Health Check**
+```
+GET /health
+→ {"status": "UP"}
+```
+
+**채팅**
+```
+POST /api/v1/chat
+Content-Type: application/json
+```
+
+Request:
+```json
+{ "user_id": "user001", "question": "GOOD과 DEFECT의 차이는?" }
+```
+
+Response:
+```json
+{
+  "status": "success",
+  "intent": "용어",
+  "keywords": ["GOOD", "DEFECT", "차이"],
+  "answer": "...",
+  "confidence_score": 0.82,
+  "retry_count": 0,
+  "runtime": 1.204
+}
+```
+
+오류 시:
+```json
+{
+  "status": "error",
+  "intent": null,
+  "keywords": null,
+  "answer": "AI 처리 중 오류가 발생했습니다.",
+  "confidence_score": null,
+  "retry_count": null,
+  "runtime": null
+}
+```
+
+curl 예제:
+```bash
+curl http://localhost:8000/health
+
+curl -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"user001","question":"GOOD과 DEFECT의 차이는?"}'
+```
+
 ## 제약사항 / TODO
 
 - **Multi Query Retrieval 순차 처리**: 2차 재시도 시 질의 변형 3개를 순차적으로 임베딩·검색합니다(병렬 처리 아님). 해당 구간에서 지연이 발생할 수 있습니다.
@@ -119,4 +198,7 @@ PowerShell 실행 정책 때문에 `Activate.ps1`이 막히면, 활성화 없이
 - **자동 승인**: `scripts/ingest.py`는 데모 목적으로 적재 시 `approval_status`를 자동으로 `approved` 처리합니다(원본 `wiki/*.md`는 `pending` 유지). 실제 운영에는 별도 승인 워크플로가 필요합니다.
 - **Gemini 무료 티어 쿼터**: 재시도 루프는 질문 1건당 Gemini 호출이 여러 번(최악의 경우 10회 내외) 발생할 수 있어 무료 티어 쿼터에 걸리기 쉽습니다. 지속 사용 시 유료 플랜을 권장합니다.
 - **confidence 신뢰성**: 벡터 유사도 단일 지표만으로 판단하므로, 도메인과 무관한 질문에 관련 용어가 우연히 섞이면 오탐할 수 있습니다(프롬프트 가드로 완화했으나 근본 해결은 아님).
+- **API 인증/속도제한 없음**: 현재 CORS `*` 허용, 인증 없이 열려 있습니다. 외부 공개 시 API 키 검증이나 rate limiting 추가가 필요합니다.
+- **user_id 미사용**: 요청에서 받지만 로깅에만 쓰고 그래프 상태에는 반영하지 않습니다. 세션별 대화 이력이 필요해지면 `state.py`에 필드 추가가 필요합니다.
+- **동시 요청과 쿼터**: 요청 1건당 Gemini 호출이 여러 번 발생하므로, 동시 사용자가 늘면 무료 티어 쿼터에 더 쉽게 걸립니다.
 
