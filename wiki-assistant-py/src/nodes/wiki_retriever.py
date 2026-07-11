@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from ..clients.gemini import embed_text
+from ..clients.llm import embed_text
 from ..clients.qdrant import search_chunks
 from ..config import config
 from ..state import RetrievedChunk, WikiAssistantState

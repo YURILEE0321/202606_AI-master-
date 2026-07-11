@@ -15,15 +15,16 @@ from .state import WikiAssistantState
 
 # confidence_checker가 이미 confidence_score/retry_count를 계산해두었으므로,
 # 여기서는 동일한 통과 조건을 그대로 다시 평가해 다음 노드만 결정한다(부수효과 없음).
-# confidence는 검색 점수만으로 판단되므로 Answer Generator(LLM 호출) 전에 분기할 수 있다:
-#   통과 -> Context Builder -> Answer Generator에서 실제 답변을 생성.
+# Context Builder는 LLM 호출이 없는 결정론적 노드라 항상 먼저 실행해도 비용이 들지 않는다.
+# Confidence Checker는 그 context로 RAGAS Context Precision/Recall까지 평가해 confidence_score를 낸다:
+#   통과 -> Answer Generator에서 실제 답변을 생성 (여기서 Faithfulness/Answer Relevancy도 참고용으로 평가).
 #   재시도 여력 있음 -> Query Rewriter로 질문을 개선해 루프.
 #   재시도 소진 -> Answer Generator를 거치지 않고 바로 담당자 안내로 종료(불필요한 LLM 호출 절약).
 def _route_after_confidence(state: WikiAssistantState) -> str:
     reranked_docs = state.get("reranked_docs", [])
     passed = bool(reranked_docs) and state.get("confidence_score", 0) >= config.confidence_threshold
     if passed:
-        return "context_builder"
+        return "answer_generator"
     if state.get("retry_count", 0) <= config.max_retries:
         return "query_rewriter"
     return END
@@ -39,8 +40,8 @@ def build_graph():
     graph.add_node("query_optimizer", query_optimizer)
     graph.add_node("wiki_retriever", wiki_retriever)
     graph.add_node("document_reranker", document_reranker)
-    graph.add_node("confidence_checker", confidence_checker)
     graph.add_node("context_builder", context_builder)
+    graph.add_node("confidence_checker", confidence_checker)
     graph.add_node("answer_generator", answer_generator)
     graph.add_node("query_rewriter", query_rewriter)
 
@@ -48,13 +49,13 @@ def build_graph():
     graph.add_edge("question_analyzer", "query_optimizer")
     graph.add_edge("query_optimizer", "wiki_retriever")
     graph.add_edge("wiki_retriever", "document_reranker")
-    graph.add_edge("document_reranker", "confidence_checker")
+    graph.add_edge("document_reranker", "context_builder")
+    graph.add_edge("context_builder", "confidence_checker")
     graph.add_conditional_edges(
         "confidence_checker",
         _route_after_confidence,
-        {"context_builder": "context_builder", "query_rewriter": "query_rewriter", END: END},
+        {"answer_generator": "answer_generator", "query_rewriter": "query_rewriter", END: END},
     )
-    graph.add_edge("context_builder", "answer_generator")
     graph.add_edge("answer_generator", END)
     graph.add_edge("query_rewriter", "question_analyzer")
 

@@ -5,12 +5,12 @@ from ..config import config
 from ..state import RetrievedChunk, WikiAssistantState
 
 
-def _keyword_overlap_score(text: str, keywords: List[str]) -> float:
-    if not keywords:
+def _overlap_score(text: str, terms: List[str]) -> float:
+    if not terms:
         return 0.0
     lower_text = text.lower()
-    hits = sum(1 for k in keywords if k.lower() in lower_text)
-    return hits / len(keywords)
+    hits = sum(1 for t in terms if t.lower() in lower_text)
+    return hits / len(terms)
 
 
 def _parse_date(value: str):
@@ -35,17 +35,20 @@ def _recency_score(updated_date: str, all_dates: List[str]) -> float:
     return (t - min_t) / (max_t - min_t)
 
 
-# vector 유사도 70%, 키워드 일치 15%, 최신성 10%로 재정렬한다.
+# vector 유사도 65%, 개체명(entity) 일치 15%, 키워드 일치 10%, 최신성 10%로 재정렬한다.
+# entities는 질문에 명시된 정확한 고유명사라 일반 keywords보다 더 신뢰도 높은 신호로 취급한다.
 def document_reranker(state: WikiAssistantState) -> dict:
     docs = state.get("retrieved_docs", [])
     all_dates = [d["updated_date"] for d in docs]
     keywords = state.get("keywords", [])
+    entities = state.get("entities", [])
 
     scored = []
     for doc in docs:
-        kw = _keyword_overlap_score(doc["text"], keywords)
+        ent = _overlap_score(doc["text"], entities)
+        kw = _overlap_score(doc["text"], keywords)
         rec = _recency_score(doc["updated_date"], all_dates)
-        combined = 0.75 * doc["score"] + 0.15 * kw + 0.1 * rec
+        combined = 0.65 * doc["score"] + 0.15 * ent + 0.1 * kw + 0.1 * rec
         scored.append((doc, combined))
 
     scored.sort(key=lambda pair: pair[1], reverse=True)

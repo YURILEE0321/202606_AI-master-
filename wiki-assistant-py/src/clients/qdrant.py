@@ -7,7 +7,7 @@ from ..config import config
 
 client = QdrantClient(url=config.qdrant_url, api_key=config.qdrant_api_key)
 
-# gemini-embedding-001 default output dimension
+# gemini-embedding-001과 text-embedding-3-large 모두 기본 출력 차원이 3072라 프로바이더 전환 시에도 그대로 쓴다.
 _VECTOR_SIZE = 3072
 
 

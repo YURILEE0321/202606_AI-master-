@@ -53,6 +53,36 @@ def _with_retry(label: str, fn: Callable[[], T]) -> T:
             attempt += 1
 
 
+_GEMINI_TYPE_MAP = {
+    "object": types.Type.OBJECT,
+    "string": types.Type.STRING,
+    "array": types.Type.ARRAY,
+    "number": types.Type.NUMBER,
+    "integer": types.Type.INTEGER,
+    "boolean": types.Type.BOOLEAN,
+}
+
+
+def _to_gemini_schema(schema: Any) -> Any:
+    # 노드는 프로바이더 중립적인 JSON Schema(소문자 type 문자열)로 스키마를 정의한다.
+    # Gemini SDK는 types.Type enum을 요구하므로 여기서 변환한다.
+    if not isinstance(schema, dict):
+        return schema
+    result: Dict[str, Any] = {}
+    for key, value in schema.items():
+        if key == "type" and isinstance(value, str):
+            result[key] = _GEMINI_TYPE_MAP.get(value, value)
+        elif key == "properties" and isinstance(value, dict):
+            result[key] = {k: _to_gemini_schema(v) for k, v in value.items()}
+        elif key == "items":
+            result[key] = _to_gemini_schema(value)
+        elif key == "additionalProperties":
+            continue  # Gemini Schema에는 없는 필드라 제거한다.
+        else:
+            result[key] = value
+    return result
+
+
 def embed_texts(texts: List[str]) -> List[List[float]]:
     def _call():
         return _client.models.embed_content(model=config.embedding_model, contents=texts)
@@ -76,7 +106,7 @@ def generate_json(prompt: str, schema: Dict[str, Any], system_instruction: Optio
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
                 response_mime_type="application/json",
-                response_schema=schema,
+                response_schema=_to_gemini_schema(schema),
             ),
         )
 

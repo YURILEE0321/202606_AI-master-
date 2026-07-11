@@ -32,11 +32,25 @@ def main() -> None:
 
     print("=" * 40)
     print(f"질문: {question}")
-    print(f"intent: {result.get('intent')} / keywords: {', '.join(result.get('keywords', []))}")
+    print(
+        f"intent: {result.get('intent')} / entities: {', '.join(result.get('entities', []))} "
+        f"/ keywords: {', '.join(result.get('keywords', []))}"
+    )
     print(
         f"confidence: {result.get('confidence_score', 0):.2f} / retry: {result.get('retry_count', 0)} "
         f"/ escalation: {result.get('escalation_required')}"
     )
+    print(
+        f"  ㄴ similarity={result.get('similarity_score', 0):.2f}, "
+        f"context_precision={result.get('context_precision', 0):.2f}, "
+        f"context_recall={result.get('context_recall', 0):.2f}"
+    )
+    if "faithfulness" in result:
+        print(
+            f"  ㄴ (참고) faithfulness={result.get('faithfulness', 0):.2f}, "
+            f"answer_relevancy={result.get('answer_relevancy', 0):.2f}, "
+            f"ragas_full_score={result.get('ragas_full_score', 0):.2f}"
+        )
     attempt_log = result.get("attempt_log", [])
     if attempt_log:
         print("-" * 40)

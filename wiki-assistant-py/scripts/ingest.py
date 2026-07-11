@@ -1,4 +1,5 @@
-# wiki/*.md(개별 문서 3건)를 읽어 청킹 -> Gemini 임베딩 -> Qdrant 적재, 문서 메타데이터는 Postgres에 upsert한다.
+# wiki/*.md(개별 문서 3건)를 읽어 청킹 -> 임베딩(LLM_PROVIDER에 따라 Gemini 또는 Azure OpenAI) -> Qdrant 적재,
+# 문서 메타데이터는 Postgres에 upsert한다.
 # 사용법: python -m scripts.ingest [--no-approve]
 #   --no-approve : 적재 시 frontmatter의 approval_status(pending)를 그대로 저장한다.
 #                  기본값은 데모 목적으로 approval_status를 "approved"로 강제 저장한다.
@@ -8,7 +9,7 @@ from pathlib import Path
 
 import frontmatter
 
-from src.clients.gemini import embed_texts
+from src.clients.llm import embed_texts
 from src.clients.postgres import ensure_schema, upsert_document_metadata
 from src.clients.qdrant import delete_by_doc_id, ensure_collection, upsert_chunks
 from src.lib.chunk import chunk_markdown
