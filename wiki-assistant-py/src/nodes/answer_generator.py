@@ -1,4 +1,6 @@
 from ..clients.llm import generate_json
+from ..config import config
+from ..lib.history import recent_turns
 from ..lib.ragas_metrics import evaluate_answer
 from ..prompts import build_answer_generator_prompt, load_system_prompt
 from ..state import FinalAnswer, WikiAssistantState
@@ -47,8 +49,11 @@ def answer_generator(state: WikiAssistantState) -> dict:
         return {"answer": _NO_CONTEXT_ANSWER, "final_message": _format_final_message(_NO_CONTEXT_ANSWER, state)}
 
     system_prompt = load_system_prompt()
+    history = recent_turns(state.get("history", []), config.history_window_turns)
     # 검색에는 Query Rewriter가 개선한 state["question"]을 쓰지만, 사용자에게 답할 때는 원래 질문 기준으로 답한다.
-    prompt = build_answer_generator_prompt(question, context)
+    # history를 함께 넘겨 "여기서"/"그거" 같은 지시어가 가리키는 대상이 실제로 그 기능을 지원하는지
+    # 컨텍스트와 대조해서 답하도록 한다(Question Analyzer의 entities 해석만으로는 부족한 경우 보완).
+    prompt = build_answer_generator_prompt(question, context, history)
 
     answer = generate_json(prompt=prompt, schema=_SCHEMA, system_instruction=system_prompt)
 
