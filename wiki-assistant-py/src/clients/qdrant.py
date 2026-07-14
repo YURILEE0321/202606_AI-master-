@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
@@ -41,13 +41,24 @@ def upsert_chunks(points: List[Dict[str, Any]]) -> None:
     )
 
 
-def search_chunks(vector: Sequence[float], limit: int, approval_statuses: List[str]):
+def search_chunks(
+    vector: Sequence[float],
+    limit: int,
+    approval_statuses: List[str],
+    doc_ids: Optional[List[str]] = None,
+):
+    # doc_ids가 주어지면(예: backend-proxy의 space_id로 걸러진 승인 문서 목록) approvalStatus와 AND로 묶어
+    # 그 문서들만 검색 대상으로 좁힌다. docId에는 ensure_collection()에서 이미 keyword 인덱스를 만들어뒀다.
+    must: List[qmodels.FieldCondition] = [
+        qmodels.FieldCondition(key="approvalStatus", match=qmodels.MatchAny(any=approval_statuses))
+    ]
+    if doc_ids:
+        must.append(qmodels.FieldCondition(key="docId", match=qmodels.MatchAny(any=doc_ids)))
+
     return client.query_points(
         collection_name=config.qdrant_collection,
         query=list(vector),
         limit=limit,
         with_payload=True,
-        query_filter=qmodels.Filter(
-            must=[qmodels.FieldCondition(key="approvalStatus", match=qmodels.MatchAny(any=approval_statuses))]
-        ),
+        query_filter=qmodels.Filter(must=must),
     ).points

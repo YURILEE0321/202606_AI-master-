@@ -1,0 +1,172 @@
+---
+id: GLOSSARY-022
+title: AI Defect Inspection Platform 용어 사전
+doc_type: 용어 사전
+category: AI Defect Inspection Platform
+version: v1.0
+created_date: 2026-07-02
+updated_date: 2026-07-02
+approval_status: pending
+approved_by: null
+tags: [용어사전, 반도체, 웨이퍼, 검사프로세스, 모델, 메타데이터]
+source_file: data/22 용어 사전.md
+related_menus: []
+summary: 반도체 검사 이미지를 수집하여 AI 모델로 양품/불량을 판정하는 AI Defect Inspection Platform에서 사용하는 검사·모델·데이터 관련 용어 사전.
+---
+
+# AI Defect Inspection Platform 용어 사전
+
+## 개요
+
+AI Defect Inspection Platform은 반도체 장비에서 생성된 검사 이미지를 수집하고 AI 모델을 이용하여 양품(Good)/불량품(Bad)을 판정하는 플랫폼이다.
+주요 기능은 데이터 수집, AI 추론, 결과 저장, 모델 관리, 모니터링이며, 주요 사용자는 운영자, AI 개발자, 공정 엔지니어이다.
+
+| 항목 | 설명 |
+| --- | --- |
+| 플랫폼명 | AI Defect Inspection Platform |
+| 목적 | 반도체 장비 검사 이미지 기반 양품/불량 판정 |
+| 주요 기능 | 데이터 수집, AI 추론, 결과 저장, 모델 관리, 모니터링 |
+| 주요 사용자 | 운영자, AI 개발자, 공정 엔지니어 |
+
+## 예상 질문
+
+- "Lot이 무엇인가요?"
+- "Recipe와 Product의 차이가 무엇인가요?"
+- "Model Version은 어디에서 확인하나요?"
+- "Good/Bad는 어떤 기준으로 판정되나요?"
+- "Confidence Score가 의미하는 것은 무엇인가요?"
+- "Inference Time은 어느 단계에서 측정되나요?"
+- "Transaction ID는 언제 생성되나요?"
+- "데이터 생성일시와 적재일시의 차이는 무엇인가요?"
+
+## 주요 내용
+
+### 검사 프로세스
+
+```
+반도체 장비 → Image Capture → Data Collector → AI Inference Server → AI Model
+→ Good / Bad 판정 → Result DB → Dashboard
+```
+
+### 주요 용어
+
+| 용어 | 설명 |
+| --- | --- |
+| Inspection | 검사 공정 |
+| AI Inference | AI 모델이 이미지를 분석하여 예측하는 과정 |
+| Prediction | 모델이 생성한 판정 결과 |
+| Good | 정상 제품 |
+| Bad | 불량 제품 |
+| Confidence Score | 모델이 판정한 신뢰도(0~100%) |
+| Defect | 결함 |
+| Defect Type | 결함 종류 |
+| Inference Time | 모델 추론 시간 |
+| Image | 장비에서 촬영한 검사 이미지 |
+
+### 모델 용어
+
+| 용어 | 설명 |
+| --- | --- |
+| Model | 딥러닝 학습 모델 |
+| Model Name | 모델 이름 |
+| Model Version | 모델 버전 |
+| Model Type | Classification / Detection / Segmentation |
+| Deploy Model | 운영 중인 모델 |
+| Training Model | 학습 중인 모델 |
+| Inference Model | 실제 판정에 사용되는 모델 |
+| Accuracy | 정확도 |
+| Precision | 정밀도 |
+| Recall | 재현율 |
+| F1 Score | 모델 성능 평가 지표 |
+| Threshold | 양불 판정 기준값 |
+
+### 데이터 용어
+
+| 용어 | 설명 |
+| --- | --- |
+| Lot | 동일한 생산 조건으로 제조된 제품 묶음 |
+| Wafer | 반도체 웨이퍼 |
+| Wafer ID | 웨이퍼 식별 번호 |
+| Carrier ID | 웨이퍼 Carrier 번호 |
+| Recipe | 검사 조건 |
+| Equipment ID | 검사 장비 ID |
+| Product ID | 제품 번호 |
+| Image ID | 이미지 식별 번호 |
+| Inspection Time | 검사 수행 시간 |
+| Created Time | 데이터 생성 일시 |
+| Upload Time | 플랫폼 적재 시간 |
+| File Name | 이미지 파일명 |
+| File Path | 이미지 저장 위치 |
+| Image Size | 이미지 크기 |
+| Resolution | 이미지 해상도 |
+| Channel | Gray / RGB |
+| Format | PNG / JPG / TIFF |
+
+### AI 결과 데이터
+
+| 용어 | 설명 |
+| --- | --- |
+| Prediction Result | AI 판정 결과 |
+| Prediction Score | 예측 확률 |
+| Defect Label | 예측된 불량 종류 |
+| Bounding Box | 결함 위치 |
+| Mask | Segmentation 결과 |
+| Heatmap | 모델이 판단한 중요 영역 |
+| NG Reason | 불량 판정 사유 |
+
+### 데이터 유입 정보
+
+| 용어 | 설명 |
+| --- | --- |
+| Source System | 데이터를 전송한 시스템 |
+| Request Body | 장비가 전달한 JSON 데이터 |
+| API Version | API 버전 |
+| Request Time | 요청 시간 |
+| Receive Time | 플랫폼 수신 시간 |
+| Transaction ID | 요청 식별 번호 |
+| Batch ID | 배치 번호 |
+| Retry Count | 재전송 횟수 |
+
+### 운영 용어
+
+| 용어 | 설명 |
+| --- | --- |
+| Data Collector | 장비 데이터를 수집하는 서비스 |
+| Queue | 데이터 처리 대기열 |
+| Worker | 데이터를 처리하는 프로세스 |
+| Scheduler | 배치 수행 프로그램 |
+| Dashboard | 운영 현황 화면 |
+| Monitoring | 시스템 모니터링 |
+| Log | 시스템 로그 |
+| Alert | 장애 알림 |
+
+### 데이터 흐름
+
+```
+장비(Image) → Image Collector → API Server → Validation → Storage
+→ Inference Server → AI Model → Prediction → Result DB → Dashboard
+```
+
+### 주요 메타데이터
+
+| 항목 | 설명 | 예시 |
+| --- | --- | --- |
+| Lot | 생산 Lot | LOT202606001 |
+| Wafer ID | 웨이퍼 번호 | WF001 |
+| Product | 제품명 | DRAM |
+| Equipment | 장비번호 | EQ-001 |
+| Recipe | 검사 Recipe | RCP-100 |
+| Model | AI 모델 | Defect_v2 |
+| Version | 모델 버전 | v2.1 |
+| Prediction | 판정 | Good |
+| Score | 신뢰도 | 98.5% |
+| Created Time | 생성일시 | 2026-06-30 13:20:15 |
+| Image Path | 이미지 위치 | /image/202606/... |
+
+## 관련 용어
+
+본 문서 자체가 플랫폼 전역 용어 사전이며, 세부 용어는 "주요 내용"의 각 표를 참고한다.
+
+## 참고 자료 / 출처
+
+- 원본 문서: `data/22 용어 사전.md`

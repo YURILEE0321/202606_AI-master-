@@ -1,5 +1,5 @@
 import operator
-from typing import Annotated, List, Optional, TypedDict
+from typing import Annotated, Dict, List, Optional, TypedDict
 
 
 class RetrievedChunk(TypedDict):
@@ -64,3 +64,8 @@ class WikiAssistantState(TypedDict, total=False):
     retry_count: int
     last_rewrite_technique: str
     attempt_log: Annotated[List[str], operator.add]
+    # 2026_aimaster_wikigen(backend-proxy) 연동 전용. /assistant/v1/chat 라우트에서만 채워진다.
+    space_id: str
+    history: List[dict]  # [{"role": "user"|"assistant", "text": "..."}]
+    allowed_doc_ids: List[str]  # backend-proxy에서 승인된 문서의 wiki_doc_id 목록. 비어있으면 전체 검색(제한 없음).
+    doc_id_map: Dict[str, dict]  # wiki_doc_id -> {"document_id": ..., "title": ...}

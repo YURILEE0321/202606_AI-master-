@@ -14,7 +14,7 @@ from src.clients.postgres import ensure_schema, upsert_document_metadata
 from src.clients.qdrant import delete_by_doc_id, ensure_collection, upsert_chunks
 from src.lib.chunk import chunk_markdown
 
-_WIKI_DIR = Path(__file__).resolve().parent.parent.parent / "wiki"
+_WIKI_DIR = Path(__file__).resolve().parent.parent / "wiki"
 _EXCLUDED_FILES = {"_template.md", "AI-Wiki.md"}
 
 

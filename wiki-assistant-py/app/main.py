@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import chat
+from app.api import chat, proxy_chat
 from app.core import config
 from app.core.exception import generic_exception_handler, validation_exception_handler
 
@@ -26,6 +26,8 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
+# 경로 자체가 /assistant/v1/chat이라 접두사 없이 등록한다(backend-proxy가 그대로 호출).
+app.include_router(proxy_chat.router, tags=["proxy-chat"])
 
 
 @app.get("/health", tags=["health"])

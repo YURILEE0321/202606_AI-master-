@@ -21,6 +21,9 @@ wiki-assistant-py/ AI Wiki Assistant의 LangGraph 파이프라인 구현 (Python
 START
   │
   ▼
+Conversation History (최근 5턴)   ← history[-(5*2):], 1턴 = 사용자+어시스턴트 한 쌍
+  │
+  ▼
 Question Analyzer      (Intent Classification + Entity Extraction + Keyword Extraction)
   │
   ▼
@@ -110,6 +113,45 @@ confidence 미달 시 재시도 차수에 따라 3차에 따른 기법으로 질
 
 3회 모두 confidence 기준(0.7)을 넘지 못하면 `"질문에 해당하는 답변을 찾지 못했습니다. 담당자에게 문의 부탁드립니다."`로 종료함
 
+### 멀티턴 대화 (Window Memory)
+
+`/assistant/v1/chat`(②번 API)는 요청마다 `history`(해당 space의 전체 대화 기록)를 함께 받는다. 대화가
+10턴 가까이 길어져도 프롬프트에 넣는 맥락 크기가 계속 늘어나지 않도록, Question Analyzer 진입 직전에
+**최근 N턴(기본 5턴, window memory)만 잘라** 사용한다.
+
+```
+사용자 질문
+  │
+  ▼
+Conversation History (최근 5턴)   ← history[-(5*2):], 1턴 = 사용자+어시스턴트 한 쌍
+  │
+  ▼
+Question Analyzer      (지시어/생략된 주어를 대화 맥락에서 해석해 entities/keywords에 반영)
+  │
+  ▼
+Query Optimizer → AI Wiki Retriever → ... (이후 플로우는 기존과 동일)
+```
+
+**예시**
+
+```
+Q1. Review 메뉴가 뭐야?
+A1. AI 결과를 검토하는 화면입니다.
+
+Q2. 그럼 여기서 배포도 가능해?
+```
+
+Q2만 보면 "여기서"가 무엇을 가리키는지 알 수 없지만, Question Analyzer가 직전 대화(Q1/A1)를 함께
+받아 "여기서" → `Review 메뉴`로 해석하고 `entities: ["Review 메뉴"]`, `keywords: ["Review 메뉴", "배포", ...]`로
+추출한다. 이전 대화와 무관하거나 지시 대상이 불명확하면 추측해서 채우지 않도록 프롬프트에 명시했다
+(`src/prompts.py::QUESTION_ANALYZER_PROMPT`).
+
+- Window 자르기: `src/nodes/question_analyzer.py::_recent_turns` — `history[-(HISTORY_WINDOW_TURNS*2):]`
+- 대화 맥락 프롬프트 조립: `src/prompts.py::build_question_analyzer_prompt`
+- `history` 자체는 잘리지 않고 요청 원본 그대로 상태에 저장되며(로그/추후 확장용), Question Analyzer가
+  쓸 때만 윈도우를 적용한다 — 즉 대화 저장은 backend-proxy(`chat_messages` 테이블)가 계속 전체를 갖고
+  있고, 우리 쪽에서 매 요청마다 "최근 5턴만 본다"는 정책만 적용하는 구조다.
+
 ### 데이터 흐름
 
 `data/*.md` → (공통 템플릿 적용) → `wiki/*.md`(frontmatter 메타데이터 포함) → `scripts/ingest.py`가 헤더 기반
@@ -154,30 +196,36 @@ PowerShell 실행 정책 때문에 `Activate.ps1`이 막히면, 활성화 없이
 | `RERANK_TOP_N` | `3` | Reranker가 최종 선택할 청크 수 |
 | `CONFIDENCE_THRESHOLD` | `0.7` | 답변 확정 기준 신뢰도 |
 | `MAX_RETRIES` | `3` | Query Rewriter 최대 재시도 횟수 |
+| `HISTORY_WINDOW_TURNS` | `5` | Question Analyzer가 참고할 최근 대화 턴 수(1턴 = 사용자+어시스턴트 한 쌍, window memory) |
+| `PORT` | `8001` | FastAPI 서버 포트 |
+| `PROXY_DATABASE_URL` | (없으면 `/assistant/v1/chat` 비활성) | 2026_aimaster_wikigen backend-proxy의 Postgres(`wikidb` 스키마) |
+| `PROXY_QDRANT_SUMMARY_COLLECTION` / `PROXY_QDRANT_CHUNK_COLLECTION` | `wiki_summary` / `wiki_chunk` | 실제 Builder가 적재한 Qdrant 컬렉션명 (같은 클러스터, 다른 컬렉션) |
+| `PROXY_EMBEDDING_MODEL` | `aitl-prd-text-embedding-3-small` | 그 컬렉션이 이미 임베딩된 모델(검색 시에만 사용, 1536차원) |
 
 ## API 서버 실행 방법
 
-`wiki-assistant-py/app/`에 기존 그래프(`src/graph.py`)를 그대로 감싼 FastAPI 서버가 있습니다.
+`wiki-assistant-py/app/`에 기존 그래프(`src/graph.py`)를 그대로 감싼 FastAPI 서버가 있습니다. 엔드포인트가 두 개인데, 그래프/노드 로직은 완전히 동일하고 `wiki_retriever.py`가 `space_id` 유무로 검색 대상만 분기합니다.
 
 ```bash
 cd wiki-assistant-py
 .venv\Scripts\python.exe -m pip install -r requirements.txt   # fastapi 등 포함
 
 # 로컬 실행 (개발용, 코드 변경 시 자동 재시작)
-.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# 8001: 2026_aimaster_wikigen의 backend-proxy가 기본으로 보는 ASSISTANT_API_BASE_URL(127.0.0.1:8001)과 맞춤
+.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 
-# 또는
+# 또는 (.env의 PORT 값 사용)
 .venv\Scripts\python.exe -m app.main
 ```
 
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Swagger UI: http://localhost:8001/docs
+- ReDoc: http://localhost:8001/redoc
 
 ### Docker 실행
 
 ```bash
 docker build -t ai-wiki-assistant .
-docker run -p 8000:8000 --env-file .env ai-wiki-assistant
+docker run -p 8001:8001 --env-file .env ai-wiki-assistant
 ```
 
 ### API
@@ -188,7 +236,7 @@ GET /health
 → {"status": "UP"}
 ```
 
-**채팅**
+**① 자체 채팅 API** — 우리 자체 Qdrant 컬렉션(`ai_wiki_chunks`)을 검색합니다.
 ```
 POST /api/v1/chat
 Content-Type: application/json
@@ -227,11 +275,53 @@ Response:
 
 curl 예제:
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
-curl -X POST http://localhost:8000/api/v1/chat \
+curl -X POST http://localhost:8001/api/v1/chat \
   -H "Content-Type: application/json" \
   -d '{"user_id":"user001","question":"GOOD과 DEFECT의 차이는?"}'
+```
+
+**② 2026_aimaster_wikigen 연동 API** — backend-proxy가 그대로 호출하는 엔드포인트(`assistant` 서비스 대체). `space_id`로 backend-proxy Postgres(`wikidb` 스키마)에서 승인된 문서를 조회하고, 실제 Builder가 적재한 Qdrant(`wiki_summary`/`wiki_chunk`)를 검색합니다. `PROXY_DATABASE_URL`이 설정돼 있어야 동작합니다.
+```
+POST /assistant/v1/chat
+Content-Type: application/json
+```
+
+Request:
+```json
+{ "space_id": "spc_7f7008d2e8", "question": "What is bucketing?", "history": [] }
+```
+
+`history`에 이전 대화(`{"role": "user"|"assistant", "text": "..."}` 배열)를 넣으면 후속 질문의 지시어
+("그거", "여기서" 등)를 이전 맥락에서 해석한다(최근 5턴만 사용, 위 "멀티턴 대화" 절 참고):
+```json
+{
+  "space_id": "spc_7d13c88d88",
+  "question": "그거 Primary Key랑 뭐가 달라?",
+  "history": [
+    { "role": "user", "text": "unique key가 뭐야?" },
+    { "role": "assistant", "text": "동일한 UNIQUE KEY를 가진 레코드가 적재되면 새 레코드가 기존 레코드를 덮어쓰는 테이블 유형입니다." }
+  ]
+}
+```
+
+Response:
+```json
+{
+  "answer": "Bucketing은 데이터를 여러 물리적 단위(버킷)로 분산 저장하여...",
+  "sources": [
+    { "document_id": "doc_5d43d64002", "title": "Bucketing", "score": 0.44 }
+  ]
+}
+```
+승인된 문서가 없는 space면 `{"answer": "관련된 승인 문서를 찾지 못했어요.", "sources": []}`를 그래프 실행 없이 즉시 반환합니다.
+
+curl 예제:
+```bash
+curl -X POST http://localhost:8001/assistant/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"space_id":"spc_7f7008d2e8","question":"What is bucketing?","history":[]}'
 ```
 
 

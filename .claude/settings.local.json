@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(MODEL_NAME=gemini-2.5-flash-lite npm run ask -- \"오늘 서울 날씨 어때?\")"
+      "Bash(MODEL_NAME=gemini-2.5-flash-lite npm run ask -- \"오늘 서울 날씨 어때?\")",
+      "Read(//c/Users/yl910/Desktop/율_pc/개발/AI master/assistant code/2026_aimaster_wikigen/**)",
+      "Bash(\".venv/Scripts/python.exe\" -m pip install -q -r assistant/requirements.txt)",
+      "Bash(.venv/Scripts/python.exe -c ' *)"
     ]
   }
 }
