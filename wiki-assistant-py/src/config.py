@@ -57,6 +57,8 @@ class Config:
     # 전체 대화가 이보다 길어도(예: 10턴) 프롬프트에는 최근 N턴만 사용해 토큰/노이즈를 억제한다.
     history_window_turns: int
 
+    log_level: str
+
 
 _llm_provider = os.environ.get("LLM_PROVIDER", "gemini").strip().lower()
 
@@ -87,4 +89,5 @@ config = Config(
     proxy_top_k_summary=int(os.environ.get("PROXY_TOP_K_SUMMARY", "5")),
     proxy_top_k_chunk=int(os.environ.get("PROXY_TOP_K_CHUNK", "8")),
     history_window_turns=int(os.environ.get("HISTORY_WINDOW_TURNS", "5")),
+    log_level=os.environ.get("LOG_LEVEL", "INFO"),
 )

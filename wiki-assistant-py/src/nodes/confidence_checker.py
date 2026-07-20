@@ -1,6 +1,9 @@
 from ..config import config
+from ..lib.logger import get_logger
 from ..lib.ragas_metrics import evaluate_context
 from ..state import WikiAssistantState
+
+logger = get_logger(__name__)
 
 # Final Score = similarity_score * SIMILARITY_WEIGHT + ragas_score * RAGAS_WEIGHT
 # RAGAS 쪽에 더 높은 가중치를 준다: similarity_score는 top-1 청크의 벡터 유사도 하나뿐이라
@@ -10,6 +13,14 @@ from ..state import WikiAssistantState
 # 이미 계산돼 있고 LLM 판단의 노이즈를 보정하는 역할을 하므로 완전히 배제하지 않는다.
 _SIMILARITY_WEIGHT = 0.4
 _RAGAS_WEIGHT = 0.6
+
+# proxy(space 기반) 경로는 wiki_summary/wiki_chunk가 문서 전체를 통째로 임베딩한 것이라, 큰 문서 안의
+# 특정 단락만 물어보면 벡터가 문서 전체 내용에 희석되어 similarity_score가 구조적으로 낮게 나온다
+# (실제로 "ingest v2" 질문에서 RAGAS는 4회 시도 내내 0.73~0.85로 관련성을 확신했는데도 similarity가
+# 0.26~0.34에 머물러 confidence가 threshold를 근소하게 못 넘긴 사례로 확인됨). own 컬렉션(청크 단위
+# 임베딩이라 유사도가 더 정확)은 기존 가중치를 유지하고, proxy만 RAGAS 쪽을 더 신뢰하도록 조정한다.
+_PROXY_SIMILARITY_WEIGHT = 0.2
+_PROXY_RAGAS_WEIGHT = 0.8
 
 
 # confidence는 Similarity Score(top-1 벡터 유사도)와 RAGAS 사전 지표(Context Precision/Recall)의
@@ -23,6 +34,7 @@ _RAGAS_WEIGHT = 0.6
 def confidence_checker(state: WikiAssistantState) -> dict:
     reranked_docs = state.get("reranked_docs", [])
     similarity_score = max(0.0, min(1.0, reranked_docs[0]["score"] if reranked_docs else 0.0))
+    logger.info("CONFIDENCE_CHECKER_START reranked_docs=%d similarity_score=%.3f", len(reranked_docs), similarity_score)
 
     context = state.get("context", "")
     context_metrics = evaluate_context(state.get("original_question") or state["question"], context)
@@ -30,7 +42,10 @@ def confidence_checker(state: WikiAssistantState) -> dict:
     context_recall = context_metrics["context_recall"]
     ragas_score = (context_precision + context_recall) / 2
 
-    confidence_score = _SIMILARITY_WEIGHT * similarity_score + _RAGAS_WEIGHT * ragas_score
+    is_proxy = bool(state.get("space_id"))
+    similarity_weight = _PROXY_SIMILARITY_WEIGHT if is_proxy else _SIMILARITY_WEIGHT
+    ragas_weight = _PROXY_RAGAS_WEIGHT if is_proxy else _RAGAS_WEIGHT
+    confidence_score = similarity_weight * similarity_score + ragas_weight * ragas_score
 
     metrics = {
         "similarity_score": similarity_score,
@@ -45,8 +60,10 @@ def confidence_checker(state: WikiAssistantState) -> dict:
     )
 
     passed = bool(reranked_docs) and confidence_score >= config.confidence_threshold
+    logger.info("CONFIDENCE_CHECKER_RESULT %s passed=%s", metrics_log, passed)
 
     if passed:
+        logger.info("CONFIDENCE_CHECKER_END result=passed")
         return {
             **metrics,
             "escalation_required": False,
@@ -56,6 +73,8 @@ def confidence_checker(state: WikiAssistantState) -> dict:
     next_retry_count = state.get("retry_count", 0) + 1
 
     if next_retry_count <= config.max_retries:
+        logger.info("CONFIDENCE_CHECKER_RETRY retry_count=%d max_retries=%d", next_retry_count, config.max_retries)
+        logger.info("CONFIDENCE_CHECKER_END result=retry")
         return {
             **metrics,
             "retry_count": next_retry_count,
@@ -66,6 +85,8 @@ def confidence_checker(state: WikiAssistantState) -> dict:
             ],
         }
 
+    logger.info("CONFIDENCE_CHECKER_EXHAUSTED retry_count=%d", next_retry_count)
+    logger.info("CONFIDENCE_CHECKER_END result=exhausted")
     return {
         **metrics,
         "retry_count": next_retry_count,

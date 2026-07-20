@@ -4,7 +4,10 @@ from ..clients import proxy_db, proxy_embeddings, proxy_qdrant
 from ..clients.llm import embed_text
 from ..clients.qdrant import search_chunks
 from ..config import config
+from ..lib.logger import get_logger
 from ..state import RetrievedChunk, WikiAssistantState
+
+logger = get_logger(__name__)
 
 # 승인된 Wiki만 답변 근거로 사용한다 (시스템 프롬프트 원칙).
 _ALLOWED_APPROVAL_STATUSES = ["approved"]
@@ -33,11 +36,13 @@ def _own_retrieve(state: WikiAssistantState) -> dict:
     primary_query = state.get("search_query") or state["question"]
     variants = [q for q in state.get("query_variants", []) if q and q != primary_query]
     queries = [primary_query, *variants]
+    logger.info("WIKI_RETRIEVER_OWN_START queries=%d", len(queries))
 
     merged: Dict[str, Dict[str, Any]] = {}
     for query in queries:
         vector = embed_text(query)
         results = search_chunks(vector, config.top_k, _ALLOWED_APPROVAL_STATUSES)
+        logger.info("WIKI_RETRIEVER_OWN_SEARCH query_len=%d hits=%d", len(query), len(results))
         for r in results:
             point_id = str(r.id)
             payload = r.payload or {}
@@ -49,6 +54,11 @@ def _own_retrieve(state: WikiAssistantState) -> dict:
         _to_retrieved_chunk(point_id, entry["score"], entry["payload"]) for point_id, entry in merged.items()
     ]
     retrieved_docs.sort(key=lambda d: d["score"], reverse=True)
+    logger.info(
+        "WIKI_RETRIEVER_OWN_RESULT docs=%s",
+        [(d["doc_id"], d["title"], round(d["score"], 3)) for d in retrieved_docs],
+    )
+    logger.info("WIKI_RETRIEVER_END mode=own")
     return {"retrieved_docs": retrieved_docs}
 
 
@@ -65,8 +75,11 @@ def _proxy_retrieve(state: WikiAssistantState) -> dict:
     variants = [q for q in state.get("query_variants", []) if q and q != primary_query]
     queries = [primary_query, *variants]
     allowed_doc_ids = state.get("allowed_doc_ids", [])
+    logger.info("WIKI_RETRIEVER_PROXY_START queries=%d allowed_doc_ids=%d", len(queries), len(allowed_doc_ids))
 
     if not allowed_doc_ids:
+        logger.info("WIKI_RETRIEVER_PROXY_SKIP reason=no_allowed_doc_ids")
+        logger.info("WIKI_RETRIEVER_END mode=proxy")
         return {"retrieved_docs": []}
 
     doc_scores: Dict[str, float] = {}
@@ -75,12 +88,20 @@ def _proxy_retrieve(state: WikiAssistantState) -> dict:
         hits = proxy_qdrant.search_summary(vector, allowed_doc_ids, config.proxy_top_k_summary) + proxy_qdrant.search_chunk(
             vector, allowed_doc_ids, config.proxy_top_k_chunk
         )
+        logger.info("WIKI_RETRIEVER_PROXY_SEARCH query_len=%d hits=%d", len(query), len(hits))
         for hit in hits:
             doc_id = hit["doc_id"]
             doc_scores[doc_id] = max(doc_scores.get(doc_id, 0.0), hit["score"])
 
     if not doc_scores:
+        logger.info("WIKI_RETRIEVER_PROXY_NO_HITS")
+        logger.info("WIKI_RETRIEVER_END mode=proxy")
         return {"retrieved_docs": []}
+
+    logger.info(
+        "WIKI_RETRIEVER_PROXY_DOC_SCORES doc_scores=%s",
+        {doc_id: round(score, 3) for doc_id, score in doc_scores.items()},
+    )
 
     bodies = proxy_db.get_wikimd_bodies(list(doc_scores.keys()))
     doc_id_map = state.get("doc_id_map", {})
@@ -108,12 +129,16 @@ def _proxy_retrieve(state: WikiAssistantState) -> dict:
             )
         )
     retrieved_docs.sort(key=lambda d: d["score"], reverse=True)
+    logger.info("WIKI_RETRIEVER_PROXY_RESULT retrieved_docs=%d", len(retrieved_docs))
+    logger.info("WIKI_RETRIEVER_END mode=proxy")
     return {"retrieved_docs": retrieved_docs}
 
 
 # Multi Query Retrieval(3차 retry) 시 query_variants에 여러 질의가 담긴다.
 # 각 질의로 개별 검색을 수행한 뒤, 동일 청크(id)는 가장 높은 점수만 남기고 합친다.
 def wiki_retriever(state: WikiAssistantState) -> dict:
-    if state.get("space_id"):
+    mode = "proxy" if state.get("space_id") else "own"
+    logger.info("WIKI_RETRIEVER_START mode=%s", mode)
+    if mode == "proxy":
         return _proxy_retrieve(state)
     return _own_retrieve(state)

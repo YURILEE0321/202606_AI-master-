@@ -4,7 +4,12 @@
       "Bash(MODEL_NAME=gemini-2.5-flash-lite npm run ask -- \"오늘 서울 날씨 어때?\")",
       "Read(//c/Users/yl910/Desktop/율_pc/개발/AI master/assistant code/2026_aimaster_wikigen/**)",
       "Bash(\".venv/Scripts/python.exe\" -m pip install -q -r assistant/requirements.txt)",
-      "Bash(.venv/Scripts/python.exe -c ' *)"
+      "Bash(.venv/Scripts/python.exe -c ' *)",
+      "Bash(cp '/c/Users/yl910/Desktop/율_pc/개발/AI master/code/wiki-assistant-py/src/nodes/query_rewriter.py' '/c/Users/yl910/Desktop/율_pc/개발/AI master/assistant code/2026_aimaster_wikigen/assistant/src/nodes/query_rewriter.py')",
+      "Bash(cp '/c/Users/yl910/Desktop/율_pc/개발/AI master/code/wiki-assistant-py/src/nodes/answer_generator.py' '/c/Users/yl910/Desktop/율_pc/개발/AI master/assistant code/2026_aimaster_wikigen/assistant/src/nodes/answer_generator.py')",
+      "Bash(cp '/c/Users/yl910/Desktop/율_pc/개발/AI master/code/wiki-assistant-py/src/nodes/query_optimizer.py' '/c/Users/yl910/Desktop/율_pc/개발/AI master/assistant code/2026_aimaster_wikigen/assistant/src/nodes/query_optimizer.py')",
+      "Bash(cp '/c/Users/yl910/Desktop/율_pc/개발/AI master/code/wiki-assistant-py/src/nodes/context_builder.py' '/c/Users/yl910/Desktop/율_pc/개발/AI master/assistant code/2026_aimaster_wikigen/assistant/src/nodes/context_builder.py')",
+      "Bash(cp '/c/Users/yl910/Desktop/율_pc/개발/AI master/code/wiki-assistant-py/src/nodes/wiki_retriever.py' '/c/Users/yl910/Desktop/율_pc/개발/AI master/assistant code/2026_aimaster_wikigen/assistant/src/nodes/wiki_retriever.py')"
     ]
   }
 }

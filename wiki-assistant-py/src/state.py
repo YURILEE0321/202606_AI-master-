@@ -33,6 +33,10 @@ class FinalAnswer(TypedDict):
 
 
 class WikiAssistantState(TypedDict, total=False):
+    # Input Guardrail(START 직후)에서만 채워진다. 차단되면 이후 노드(LLM 호출 포함)를 전혀 거치지 않는다.
+    guardrail_triggered: bool
+    # "input_validation" | "prompt_injection" | "pii" | "domain" | "permission"
+    guardrail_reason: str
     question: str
     # 최초 질문 원문. Query Rewriter가 question을 계속 고쳐 쓰므로, 답변 생성/로그 표시에는 이 값을 기준으로 삼는다.
     original_question: str

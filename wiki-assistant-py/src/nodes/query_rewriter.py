@@ -1,6 +1,9 @@
 from ..clients.llm import generate_json
+from ..lib.logger import get_logger
 from ..prompts import build_multi_query_prompt, build_query_expansion_prompt, build_query_rewriting_prompt
 from ..state import WikiAssistantState
+
+logger = get_logger(__name__)
 
 _REWRITE_SCHEMA = {
     "type": "object",
@@ -32,13 +35,27 @@ def query_rewriter(state: WikiAssistantState) -> dict:
     entities = state.get("entities", [])
     context = state.get("context", "")
     attempt = state.get("retry_count", 0)
+    is_proxy = bool(state.get("space_id"))
+    # confidence_checker가 바로 앞 단계에서 이미 채워둔 지표 — 어떤 신뢰도였길래 재작성이 필요했는지 남긴다.
+    logger.info(
+        "QUERY_REWRITER_START attempt=%d confidence_score=%.3f similarity_score=%.3f "
+        "context_precision=%.3f context_recall=%.3f question_before_rewrite=%r",
+        attempt,
+        state.get("confidence_score", 0.0),
+        state.get("similarity_score", 0.0),
+        state.get("context_precision", 0.0),
+        state.get("context_recall", 0.0),
+        state["question"],
+    )
 
     if attempt == 1:
         result = generate_json(
-            prompt=build_query_rewriting_prompt(original_question, keywords, entities, context),
+            prompt=build_query_rewriting_prompt(original_question, keywords, entities, context, is_proxy),
             schema=_REWRITE_SCHEMA,
         )
         rewritten = result["rewritten_question"]
+        logger.info("QUERY_REWRITER_RESULT technique=QueryRewriting rewritten_question=%r", rewritten)
+        logger.info("QUERY_REWRITER_END")
         return {
             "question": rewritten,
             "query_variants": [],
@@ -48,11 +65,17 @@ def query_rewriter(state: WikiAssistantState) -> dict:
 
     if attempt == 2:
         result = generate_json(
-            prompt=build_query_expansion_prompt(original_question, keywords, entities, context),
+            prompt=build_query_expansion_prompt(original_question, keywords, entities, context, is_proxy),
             schema=_EXPANSION_SCHEMA,
         )
         expanded = result["expanded_question"]
         related_terms = result["related_terms"]
+        logger.info(
+            "QUERY_REWRITER_RESULT technique=QueryExpansion expanded_question=%r related_terms=%s",
+            expanded,
+            related_terms,
+        )
+        logger.info("QUERY_REWRITER_END")
         return {
             "question": expanded,
             "query_variants": [],
@@ -63,10 +86,12 @@ def query_rewriter(state: WikiAssistantState) -> dict:
         }
 
     result = generate_json(
-        prompt=build_multi_query_prompt(original_question, keywords, entities, context),
+        prompt=build_multi_query_prompt(original_question, keywords, entities, context, is_proxy),
         schema=_MULTI_QUERY_SCHEMA,
     )
     variants = result["variants"]
+    logger.info("QUERY_REWRITER_RESULT technique=MultiQueryRetrieval variants=%s", variants)
+    logger.info("QUERY_REWRITER_END")
     return {
         "question": original_question,
         "query_variants": variants,

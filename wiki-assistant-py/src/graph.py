@@ -6,11 +6,17 @@ from .nodes.answer_generator import answer_generator
 from .nodes.confidence_checker import confidence_checker
 from .nodes.context_builder import context_builder
 from .nodes.document_reranker import document_reranker
+from .nodes.guardrail import guardrail
 from .nodes.query_optimizer import query_optimizer
 from .nodes.query_rewriter import query_rewriter
 from .nodes.question_analyzer import question_analyzer
 from .nodes.wiki_retriever import wiki_retriever
 from .state import WikiAssistantState
+
+
+# Guardrail이 차단 판정을 내리면 나머지 파이프라인(LLM 호출 포함)을 전혀 거치지 않고 바로 종료한다.
+def _route_after_guardrail(state: WikiAssistantState) -> str:
+    return END if state.get("guardrail_triggered") else "question_analyzer"
 
 
 # confidence_checker가 이미 confidence_score/retry_count를 계산해두었으므로,
@@ -36,6 +42,7 @@ def build_graph():
     # LangGraph 자체의 기본 노드 재시도(기본 max_attempts=3)까지 겹치면 재시도가 최대 3x4회로
     # 불어나고 로그 상 재시도 횟수가 들쭉날쭉해 보이므로, 그래프 차원의 재시도는 꺼둔다.
     graph.set_node_defaults(retry_policy=RetryPolicy(max_attempts=1))
+    graph.add_node("guardrail", guardrail)
     graph.add_node("question_analyzer", question_analyzer)
     graph.add_node("query_optimizer", query_optimizer)
     graph.add_node("wiki_retriever", wiki_retriever)
@@ -45,7 +52,10 @@ def build_graph():
     graph.add_node("answer_generator", answer_generator)
     graph.add_node("query_rewriter", query_rewriter)
 
-    graph.add_edge(START, "question_analyzer")
+    graph.add_edge(START, "guardrail")
+    graph.add_conditional_edges(
+        "guardrail", _route_after_guardrail, {"question_analyzer": "question_analyzer", END: END}
+    )
     graph.add_edge("question_analyzer", "query_optimizer")
     graph.add_edge("query_optimizer", "wiki_retriever")
     graph.add_edge("wiki_retriever", "document_reranker")

@@ -1,9 +1,12 @@
 from ..clients.llm import generate_json
 from ..config import config
 from ..lib.history import recent_turns
+from ..lib.logger import get_logger
 from ..lib.ragas_metrics import evaluate_answer
 from ..prompts import build_answer_generator_prompt, load_system_prompt
 from ..state import FinalAnswer, WikiAssistantState
+
+logger = get_logger(__name__)
 
 _SCHEMA = {
     "type": "object",
@@ -44,8 +47,11 @@ def _format_final_message(answer: FinalAnswer, state: WikiAssistantState) -> str
 def answer_generator(state: WikiAssistantState) -> dict:
     context = state.get("context", "")
     question = state.get("original_question") or state["question"]
+    logger.info("ANSWER_GENERATOR_START context_len=%d", len(context))
 
     if not context.strip():
+        logger.info("ANSWER_GENERATOR_NO_CONTEXT")
+        logger.info("ANSWER_GENERATOR_END result=no_context")
         return {"answer": _NO_CONTEXT_ANSWER, "final_message": _format_final_message(_NO_CONTEXT_ANSWER, state)}
 
     system_prompt = load_system_prompt()
@@ -56,6 +62,13 @@ def answer_generator(state: WikiAssistantState) -> dict:
     prompt = build_answer_generator_prompt(question, context, history)
 
     answer = generate_json(prompt=prompt, schema=_SCHEMA, system_instruction=system_prompt)
+    logger.info(
+        "ANSWER_GENERATOR_RESULT core_answer=%r detail=%r related_menus=%s references=%s",
+        answer["core_answer"],
+        answer["detail"],
+        answer["related_menus"],
+        answer["references"],
+    )
 
     # Faithfulness/Answer Relevancy는 생성된 답변이 있어야 계산 가능하므로 여기서 평가한다.
     # 이미 Confidence Checker에서 통과 판정을 내린 뒤라 재시도를 다시 트리거하진 않고, 참고/로깅용이다.
@@ -65,6 +78,13 @@ def answer_generator(state: WikiAssistantState) -> dict:
     ragas_full_score = (
         state.get("context_precision", 0.0) + state.get("context_recall", 0.0) + faithfulness + answer_relevancy
     ) / 4
+    logger.info(
+        "ANSWER_GENERATOR_RAGAS faithfulness=%.3f answer_relevancy=%.3f ragas_full_score=%.3f",
+        faithfulness,
+        answer_relevancy,
+        ragas_full_score,
+    )
+    logger.info("ANSWER_GENERATOR_END result=success")
 
     return {
         "answer": answer,

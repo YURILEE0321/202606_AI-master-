@@ -2,7 +2,10 @@ from datetime import datetime
 from typing import List
 
 from ..config import config
+from ..lib.logger import get_logger
 from ..state import RetrievedChunk, WikiAssistantState
+
+logger = get_logger(__name__)
 
 
 def _overlap_score(text: str, terms: List[str]) -> float:
@@ -42,6 +45,7 @@ def document_reranker(state: WikiAssistantState) -> dict:
     all_dates = [d["updated_date"] for d in docs]
     keywords = state.get("keywords", [])
     entities = state.get("entities", [])
+    logger.info("DOCUMENT_RERANKER_START candidates=%d", len(docs))
 
     scored = []
     for doc in docs:
@@ -56,5 +60,12 @@ def document_reranker(state: WikiAssistantState) -> dict:
     reranked_docs: List[RetrievedChunk] = [
         {**doc, "score": combined} for doc, combined in scored[: config.rerank_top_n]
     ]
+
+    logger.info(
+        "DOCUMENT_RERANKER_RESULT top_n=%d scores=%s",
+        len(reranked_docs),
+        [(d["doc_id"], round(d["score"], 3)) for d in reranked_docs],
+    )
+    logger.info("DOCUMENT_RERANKER_END")
 
     return {"reranked_docs": reranked_docs}
